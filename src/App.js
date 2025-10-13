@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import "./App.css"; // ✅ Styles
+import "./App.css";
 
 function App() {
   const [message, setMessage] = useState("");
@@ -12,7 +12,11 @@ function App() {
   const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
-    // Load personas from backend
+    if (!API_BASE_URL) {
+      console.error("API_BASE_URL is not defined!");
+      return;
+    }
+
     fetch(`${API_BASE_URL}/`)
       .then((res) => res.json())
       .then((data) => setPersonas(data.available_personas || []))
@@ -20,7 +24,6 @@ function App() {
   }, [API_BASE_URL]);
 
   useEffect(() => {
-    // Auto-scroll to the latest message
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
@@ -38,11 +41,15 @@ function App() {
       setChatHistory([
         ...chatHistory,
         { sender: "user", text: message },
-        { sender: "bot", text: data.response },
+        { sender: "bot", text: data.response || "No response from backend." },
       ]);
       setMessage("");
     } catch (err) {
       console.error("Error sending message:", err);
+      setChatHistory([
+        ...chatHistory,
+        { sender: "bot", text: "Error: Could not reach backend." },
+      ]);
     }
   };
 
@@ -54,7 +61,9 @@ function App() {
     <div className="chat-container">
       <h2>Simulated Interview Chat</h2>
       <select onChange={(e) => setPersona(e.target.value)} value={persona}>
-        <option value="">Select Persona</option>
+        <option value="">
+          {personas.length === 0 ? "Loading personas..." : "Select Persona"}
+        </option>
         {personas.map((p) => (
           <option key={p} value={p}>{p}</option>
         ))}
@@ -72,7 +81,7 @@ function App() {
         value={message}
         placeholder="Type your message..."
         onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyPress} // ✅ Enter key works
+        onKeyDown={handleKeyPress}
       />
       <button onClick={sendMessage}>Send</button>
     </div>
