@@ -2,55 +2,33 @@ import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 
 function App() {
-  const [studentName, setStudentName] = useState("");
-  const [persona, setPersona] = useState("");
-  const [personas, setPersonas] = useState([]);
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
-  const [loadingPersonas, setLoadingPersonas] = useState(true);
-  const [error, setError] = useState(null);
+  const [persona, setPersona] = useState("");
+  const [personas, setPersonas] = useState([]);
+  const [studentName, setStudentName] = useState("");
+  const [downloadSecret, setDownloadSecret] = useState("");
+  const [downloadMessage, setDownloadMessage] = useState("");
   const chatEndRef = useRef(null);
 
-  // ✅ Use environment variable for backend URL
+  // Use environment variable for backend URL
   const API_BASE_URL = process.env.REACT_APP_API_URL;
 
-  // 🔹 Fetch personas from backend
   useEffect(() => {
-    const fetchPersonas = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/`);
-        if (!res.ok) throw new Error("Failed to fetch personas");
-        const data = await res.json();
-        setPersonas(data.available_personas || []);
-      } catch (err) {
-        setError("Error loading personas. Please try again later.");
-        console.error("Error fetching personas:", err);
-      } finally {
-        setLoadingPersonas(false);
-      }
-    };
-
-    fetchPersonas();
+    // Load personas from backend
+    fetch(`${API_BASE_URL}/`)
+      .then((res) => res.json())
+      .then((data) => setPersonas(data.available_personas || []))
+      .catch((err) => console.error("Error fetching personas:", err));
   }, [API_BASE_URL]);
 
-  // 🔹 Scroll chat to bottom on update
   useEffect(() => {
+    // Auto-scroll to latest message
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
-  // 🔹 Send message to backend
   const sendMessage = async () => {
-    if (!studentName.trim()) {
-      setError("Please enter your name before starting.");
-      return;
-    }
-    if (!persona) {
-      setError("Please select a persona.");
-      return;
-    }
-    if (!message.trim()) return;
-
-    setError(null);
+    if (!message || !persona || !studentName) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/chat`, {
@@ -58,19 +36,15 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, persona, student_name: studentName }),
       });
-
-      if (!response.ok) throw new Error("Failed to send message");
       const data = await response.json();
 
-      setChatHistory((prev) => [
-        ...prev,
+      setChatHistory([
+        ...chatHistory,
         { sender: "user", text: message },
         { sender: "bot", text: data.response },
       ]);
-
       setMessage("");
     } catch (err) {
-      setError("Network error. Please try again.");
       console.error("Error sending message:", err);
     }
   };
@@ -79,42 +53,52 @@ function App() {
     if (e.key === "Enter") sendMessage();
   };
 
+  const downloadLogs = async () => {
+    if (!downloadSecret) {
+      setDownloadMessage("Please enter the secret key to download logs.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/download-logs?secret=${downloadSecret}`);
+      if (!res.ok) throw new Error("Failed to fetch logs.");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "student_logs.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setDownloadMessage("Logs downloaded successfully.");
+    } catch (err) {
+      console.error(err);
+      setDownloadMessage("Failed to download logs. Check secret key.");
+    }
+  };
+
   return (
     <div className="chat-container">
-      <h2>Simulated Interview Practice</h2>
-      <p className="instructions">
-        Welcome! Please enter your name, select a persona, and begin your simulated interview. 
-        Your conversation will be logged for review and feedback.
-      </p>
+      <h2>Simulated Interview Chat</h2>
 
-      {/* 🔹 Name Input */}
-      <input
-        type="text"
-        placeholder="Enter your name..."
-        value={studentName}
-        onChange={(e) => setStudentName(e.target.value)}
-        className="name-input"
-      />
+      <div className="student-input">
+        <label>Enter your name:</label>
+        <input
+          type="text"
+          value={studentName}
+          placeholder="Student Name"
+          onChange={(e) => setStudentName(e.target.value)}
+        />
+      </div>
 
-      {/* 🔹 Persona Dropdown */}
-      {loadingPersonas ? (
-        <p>Loading personas...</p>
-      ) : (
-        <select
-          onChange={(e) => setPersona(e.target.value)}
-          value={persona}
-          className="persona-select"
-        >
-          <option value="">Select Persona</option>
-          {personas.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      )}
+      <select onChange={(e) => setPersona(e.target.value)} value={persona}>
+        <option value="">Select Persona</option>
+        {personas.map((p) => (
+          <option key={p} value={p}>{p}</option>
+        ))}
+      </select>
 
-      {/* 🔹 Chat History */}
       <div className="chat-history">
         {chatHistory.map((msg, index) => (
           <div key={index} className={`message ${msg.sender}`}>
@@ -124,19 +108,27 @@ function App() {
         <div ref={chatEndRef} />
       </div>
 
-      {/* 🔹 Message Input */}
       <input
         type="text"
-        placeholder="Type your message..."
         value={message}
+        placeholder="Type your message..."
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyPress}
-        className="message-input"
       />
       <button onClick={sendMessage}>Send</button>
 
-      {/* 🔹 Error Display */}
-      {error && <p className="error">{error}</p>}
+      <hr />
+      <div className="instructor-download">
+        <h3>Instructor: Download Student Logs</h3>
+        <input
+          type="password"
+          placeholder="Enter secret key"
+          value={downloadSecret}
+          onChange={(e) => setDownloadSecret(e.target.value)}
+        />
+        <button onClick={downloadLogs}>Download Logs</button>
+        <p>{downloadMessage}</p>
+      </div>
     </div>
   );
 }
