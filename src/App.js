@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import "./App.css"; // ✅ This is correct — it imports your styles
+import "./App.css"; // ✅ Styles
 
 function App() {
   const [message, setMessage] = useState("");
@@ -8,26 +8,42 @@ function App() {
   const [personas, setPersonas] = useState([]);
   const chatEndRef = useRef(null);
 
-  useEffect(() => {
-    fetch("https://backend-simul-interviews-10092025.onrender.com/") // replace with your backend URL
-      .then(res => res.json())
-      .then(data => setPersonas(data.available_personas || []));
-  }, []);
+  // Use environment variable for backend URL
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
+    // Load personas from backend
+    fetch(`${API_BASE_URL}/`)
+      .then((res) => res.json())
+      .then((data) => setPersonas(data.available_personas || []))
+      .catch((err) => console.error("Error fetching personas:", err));
+  }, [API_BASE_URL]);
+
+  useEffect(() => {
+    // Auto-scroll to the latest message
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
   const sendMessage = async () => {
     if (!message || !persona) return;
-    const response = await fetch("https://backend-simul-interviews-10092025.onrender.com/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, persona }),
-    });
-    const data = await response.json();
-    setChatHistory([...chatHistory, { sender: "user", text: message }, { sender: "bot", text: data.response }]);
-    setMessage("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, persona }),
+      });
+      const data = await response.json();
+
+      setChatHistory([
+        ...chatHistory,
+        { sender: "user", text: message },
+        { sender: "bot", text: data.response },
+      ]);
+      setMessage("");
+    } catch (err) {
+      console.error("Error sending message:", err);
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -56,7 +72,7 @@ function App() {
         value={message}
         placeholder="Type your message..."
         onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyPress}
+        onKeyDown={handleKeyPress} // ✅ Enter key works
       />
       <button onClick={sendMessage}>Send</button>
     </div>
