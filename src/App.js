@@ -2,41 +2,49 @@ import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 
 function App() {
+  const [studentName, setStudentName] = useState("");
+  const [nameSubmitted, setNameSubmitted] = useState(false);
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [persona, setPersona] = useState("");
   const [personas, setPersonas] = useState([]);
-  const [studentName, setStudentName] = useState("");
-  const [downloadSecret, setDownloadSecret] = useState("");
-  const [downloadMessage, setDownloadMessage] = useState("");
+  const [loading, setLoading] = useState(false);
   const chatEndRef = useRef(null);
 
-  // Use environment variable for backend URL
+  // Environment variable for backend
   const API_BASE_URL = process.env.REACT_APP_API_URL;
 
+  // Load available personas
   useEffect(() => {
-    // Load personas from backend
     fetch(`${API_BASE_URL}/`)
       .then((res) => res.json())
       .then((data) => setPersonas(data.available_personas || []))
       .catch((err) => console.error("Error fetching personas:", err));
   }, [API_BASE_URL]);
 
+  // Auto-scroll on new message
   useEffect(() => {
-    // Auto-scroll to latest message
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
+  // Handle sending messages
   const sendMessage = async () => {
-    if (!message || !persona || !studentName) return;
+    if (!message || !persona) return;
 
+    setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, persona, student_name: studentName }),
+        body: JSON.stringify({
+          message,
+          persona,
+          student_name: studentName,
+        }),
       });
+
       const data = await response.json();
+      if (data.error) throw new Error(data.error);
 
       setChatHistory([
         ...chatHistory,
@@ -45,57 +53,61 @@ function App() {
       ]);
       setMessage("");
     } catch (err) {
-      console.error("Error sending message:", err);
+      console.error("Error:", err);
+      alert("There was a problem connecting to the simulation.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Allow Enter key to send
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") sendMessage();
+    if (e.key === "Enter" && !loading) sendMessage();
   };
 
-  const downloadLogs = async () => {
-    if (!downloadSecret) {
-      setDownloadMessage("Please enter the secret key to download logs.");
-      return;
-    }
+  // === First screen: student name entry ===
+  if (!nameSubmitted) {
+    return (
+      <div className="name-entry-container">
+        <div className="name-entry-card">
+          <h2>Welcome to the Simulated Interview</h2>
+          <p>Please enter your name to begin.</p>
+          <input
+            type="text"
+            placeholder="Your full name"
+            value={studentName}
+            onChange={(e) => setStudentName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && studentName && setNameSubmitted(true)}
+          />
+          <button
+            onClick={() => setNameSubmitted(true)}
+            disabled={!studentName.trim()}
+          >
+            Start Interview
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/download-logs?secret=${downloadSecret}`);
-      if (!res.ok) throw new Error("Failed to fetch logs.");
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "student_logs.json";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setDownloadMessage("Logs downloaded successfully.");
-    } catch (err) {
-      console.error(err);
-      setDownloadMessage("Failed to download logs. Check secret key.");
-    }
-  };
-
+  // === Main chat interface ===
   return (
     <div className="chat-container">
       <h2>Simulated Interview Chat</h2>
+      <p className="instructions">
+        Select a client and begin your conversation. Use trauma-informed, empathetic communication techniques.
+      </p>
 
-      <div className="student-input">
-        <label>Enter your name:</label>
-        <input
-          type="text"
-          value={studentName}
-          placeholder="Student Name"
-          onChange={(e) => setStudentName(e.target.value)}
-        />
-      </div>
-
-      <select onChange={(e) => setPersona(e.target.value)} value={persona}>
+      <select
+        onChange={(e) => setPersona(e.target.value)}
+        value={persona}
+        className="persona-select"
+      >
         <option value="">Select Persona</option>
         {personas.map((p) => (
-          <option key={p} value={p}>{p}</option>
+          <option key={p} value={p}>
+            {p}
+          </option>
         ))}
       </select>
 
@@ -108,26 +120,18 @@ function App() {
         <div ref={chatEndRef} />
       </div>
 
-      <input
-        type="text"
-        value={message}
-        placeholder="Type your message..."
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyPress}
-      />
-      <button onClick={sendMessage}>Send</button>
-
-      <hr />
-      <div className="instructor-download">
-        <h3>Instructor: Download Student Logs</h3>
+      <div className="chat-input">
         <input
-          type="password"
-          placeholder="Enter secret key"
-          value={downloadSecret}
-          onChange={(e) => setDownloadSecret(e.target.value)}
+          type="text"
+          value={message}
+          placeholder="Type your message..."
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyPress}
+          disabled={!persona || loading}
         />
-        <button onClick={downloadLogs}>Download Logs</button>
-        <p>{downloadMessage}</p>
+        <button onClick={sendMessage} disabled={!message || loading}>
+          {loading ? "Sending..." : "Send"}
+        </button>
       </div>
     </div>
   );
