@@ -95,7 +95,7 @@ function App() {
     <div className="chat-container">
       <h2>Simulated Interview Chat</h2>
       <p className="instructions">
-        Select a client and begin your conversation. Use trauma-informed, empathetic communication techniques.
+        Select a client and begin your conversation. Evidence-based interviewing techinques will produce better quality results.
       </p>
 
       <select
