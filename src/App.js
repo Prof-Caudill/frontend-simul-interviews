@@ -8,77 +8,71 @@ function App() {
   const [chatHistory, setChatHistory] = useState([]);
   const [persona, setPersona] = useState("");
   const [personas, setPersonas] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loadingPersonas, setLoadingPersonas] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState(false);
   const chatEndRef = useRef(null);
 
-  // Backend URL
   const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   // Fetch available personas
   useEffect(() => {
     const fetchPersonas = async () => {
+      setLoadingPersonas(true);
       try {
         const res = await fetch(`${API_BASE_URL}/`);
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
         const data = await res.json();
         setPersonas(data.available_personas || []);
       } catch (err) {
         console.error("Error fetching personas:", err);
-        setPersonas([]);
+        alert("Failed to load personas. Check backend connection.");
+      } finally {
+        setLoadingPersonas(false);
       }
     };
-
     fetchPersonas();
   }, [API_BASE_URL]);
 
-  // Auto-scroll to latest message
+  // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
   const sendMessage = async () => {
-    if (!message || !persona || !studentName) return;
+    if (!message || !persona) return;
+    setLoadingMessage(true);
 
-    setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/interact`, {
+      const res = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          message,
+          persona,
           student_name: studentName,
-          persona_name: persona,
-          user_input: message,
         }),
       });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || "Error sending message");
-      }
-
-      const data = await response.json();
-
-      setChatHistory((prev) => [
-        ...prev,
+      setChatHistory([
+        ...chatHistory,
         { sender: "user", text: message },
         { sender: "bot", text: data.response },
       ]);
       setMessage("");
     } catch (err) {
-      console.error("Error sending message:", err);
-      alert("There was a problem connecting to the simulation.");
+      console.error("Error:", err);
+      alert("There was a problem sending your message.");
     } finally {
-      setLoading(false);
+      setLoadingMessage(false);
     }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !loading) sendMessage();
+    if (e.key === "Enter" && !loadingMessage) sendMessage();
   };
 
-  // === Name entry screen ===
+  // === Student name entry screen ===
   if (!nameSubmitted) {
     return (
       <div className="name-entry-container">
@@ -91,7 +85,7 @@ function App() {
             value={studentName}
             onChange={(e) => setStudentName(e.target.value)}
             onKeyDown={(e) =>
-              e.key === "Enter" && studentName.trim() && setNameSubmitted(true)
+              e.key === "Enter" && studentName && setNameSubmitted(true)
             }
           />
           <button
@@ -110,9 +104,8 @@ function App() {
     <div className="chat-container">
       <h2>Simulated Interview Chat</h2>
       <p className="instructions">
-        Select a client and begin your conversation. The use of
-        evidence-based interview practices should produce more useful
-        information.
+        Select a client and begin your conversation. The use of evidence-based
+        interview practices should produce more useful information.
       </p>
 
       <select
@@ -120,16 +113,14 @@ function App() {
         value={persona}
         className="persona-select"
       >
-        <option value="">Select Persona</option>
-        {personas.length > 0 ? (
-          personas.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))
-        ) : (
-          <option disabled>Loading personas...</option>
-        )}
+        <option value="">
+          {loadingPersonas ? "Loading personas..." : "Select Persona"}
+        </option>
+        {personas.map((p) => (
+          <option key={p} value={p}>
+            {p}
+          </option>
+        ))}
       </select>
 
       <div className="chat-history">
@@ -148,10 +139,10 @@ function App() {
           placeholder="Type your message..."
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyPress}
-          disabled={!persona || loading}
+          disabled={!persona || loadingMessage}
         />
-        <button onClick={sendMessage} disabled={!message || loading}>
-          {loading ? "Sending..." : "Send"}
+        <button onClick={sendMessage} disabled={!message || loadingMessage}>
+          {loadingMessage ? "Sending..." : "Send"}
         </button>
       </div>
     </div>
