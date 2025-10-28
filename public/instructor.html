@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Instructor - Download Logs</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f6f8fb; padding:30px; }
+    .card{ max-width:600px; margin:40px auto; background:white; padding:20px; border-radius:8px; box-shadow:0 6px 16px rgba(0,0,0,0.08)}
+    input { width:100%; padding:10px; margin:8px 0; border-radius:6px; border:1px solid #ccc }
+    button { padding:10px 16px; background:#1f4e79; color:white; border:none; border-radius:6px; cursor:pointer }
+    .msg { margin-top:12px }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Instructor — Download Logs</h2>
+    <p>Enter the instructor password to download grouped logs (JSON).</p>
+    <input id="pw" type="password" placeholder="Instructor password" />
+    <button id="btn">Download Logs</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <script>
+    const btn = document.getElementById("btn");
+    const pw = document.getElementById("pw");
+    const msg = document.getElementById("msg");
+    const API_BASE = (function(){ 
+      // Replace with your backend URL if not using env-rewrite at build
+      return "https://backend-simul-interviews-10092025.onrender.com";
+    })();
+
+    btn.onclick = async () => {
+      const secret = pw.value.trim();
+      if(!secret){ msg.textContent = "Enter password."; return; }
+      msg.textContent = "Downloading...";
+      try {
+        const res = await fetch(`${API_BASE}/download_logs?password=${encodeURIComponent(secret)}`);
+        if(!res.ok){
+          const j = await res.json().catch(()=>null);
+          msg.textContent = j?.detail || "Download failed (check password).";
+          return;
+        }
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        const url = window.URL.createObjectURL(blob);
+        a.href = url;
+        a.download = "grouped_interaction_logs.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        msg.textContent = "Downloaded.";
+      } catch(err){
+        console.error(err);
+        msg.textContent = "Network error.";
+      }
+    }
+  </script>
+</body>
+</html>
